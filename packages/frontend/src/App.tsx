@@ -20,6 +20,7 @@ import SchedulePage from '@/pages/SchedulePage';
 import ThumbnailPage from '@/pages/ThumbnailPage';
 import MetadataPage from '@/pages/MetadataPage';
 import StreamKeyPage from '@/pages/StreamKeyPage';
+import VideoPage from '@/pages/VideoPage';
 import SettingsPage from '@/pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -73,6 +74,7 @@ function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/schedules" element={<SchedulePage />} />
           <Route path="/thumbnails" element={<ThumbnailPage />} />
+          <Route path="/videos" element={<VideoPage />} />
           <Route path="/metadata" element={<MetadataPage />} />
           <Route path="/stream-keys" element={<StreamKeyPage />} />
           <Route path="/settings" element={<SettingsPage />} />

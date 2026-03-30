@@ -241,6 +241,52 @@ class ApiService {
     const response = await this.client.delete(`/metadata/${id}`);
     return response.data;
   }
+
+  // Videos
+  async getVideos(channelId?: string) {
+    const params = channelId ? { channelId } : {};
+    const response = await this.client.get('/videos', { params });
+    return response.data;
+  }
+
+  async getVideo(id: string) {
+    const response = await this.client.get(`/videos/${id}`);
+    return response.data;
+  }
+
+  async uploadVideo(file: File, channelId?: string, isLoop?: boolean, loopCount?: number) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (channelId) formData.append('channelId', channelId);
+    if (isLoop !== undefined) formData.append('isLoop', String(isLoop));
+    if (loopCount !== undefined) formData.append('loopCount', String(loopCount));
+
+    const response = await this.client.post('/videos/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300000,
+    });
+    return response.data;
+  }
+
+  async updateVideo(id: string, data: Record<string, unknown>) {
+    const response = await this.client.put(`/videos/${id}`, data);
+    return response.data;
+  }
+
+  async deleteVideo(id: string) {
+    const response = await this.client.delete(`/videos/${id}`);
+    return response.data;
+  }
+
+  async toggleVideoLoop(id: string) {
+    const response = await this.client.put(`/videos/${id}/loop`);
+    return response.data;
+  }
+
+  async getLoopVideos() {
+    const response = await this.client.get('/videos/loops');
+    return response.data;
+  }
 }
 
 export const api = new ApiService();

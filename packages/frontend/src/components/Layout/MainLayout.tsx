@@ -11,11 +11,11 @@ export default function MainLayout() {
       <Sidebar />
       <div
         className={`flex flex-1 flex-col transition-all duration-300 ${
-          sidebarOpen ? 'ml-64' : 'ml-20'
+          sidebarOpen ? 'lg:ml-64' : 'ml-0 lg:ml-20'
         }`}
       >
         <Header />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
           <Outlet />
         </main>
       </div>

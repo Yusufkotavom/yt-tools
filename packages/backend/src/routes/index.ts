@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authRoutes from './auth';
 import scheduleRoutes from './schedule';
 import thumbnailRoutes from './thumbnail';
+import videoRoutes from './video';
 import streamKeyRoutes from './streamKey';
 import channelRoutes from './channel';
 import metadataRoutes from './metadata';
@@ -17,6 +18,7 @@ router.get('/health', (_req, res) => {
 router.use('/auth', authRoutes);
 router.use('/schedules', scheduleRoutes);
 router.use('/thumbnails', thumbnailRoutes);
+router.use('/videos', videoRoutes);
 router.use('/stream-keys', streamKeyRoutes);
 router.use('/channels', channelRoutes);
 router.use('/metadata', metadataRoutes);

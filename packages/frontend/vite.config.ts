@@ -10,14 +10,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 6789,
+    host: true,
+    allowedHosts: ['ytf.piiblog.net', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:6788',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:6788',
         changeOrigin: true,
       },
     },
