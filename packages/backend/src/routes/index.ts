@@ -1,0 +1,24 @@
+import { Router } from 'express';
+import authRoutes from './auth';
+import scheduleRoutes from './schedule';
+import thumbnailRoutes from './thumbnail';
+import streamKeyRoutes from './streamKey';
+import channelRoutes from './channel';
+import metadataRoutes from './metadata';
+
+const router = Router();
+
+// Health check
+router.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// API routes
+router.use('/auth', authRoutes);
+router.use('/schedules', scheduleRoutes);
+router.use('/thumbnails', thumbnailRoutes);
+router.use('/stream-keys', streamKeyRoutes);
+router.use('/channels', channelRoutes);
+router.use('/metadata', metadataRoutes);
+
+export default router;
