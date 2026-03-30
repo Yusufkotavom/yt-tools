@@ -34,25 +34,3 @@ npm-debug.log*
 
 # Prisma
 packages/backend/prisma/dev.db
-
-# Python project files (ignore)
-app.py
-yt_factory_ui.py
-yt_factory/
-catalog/
-imports/
-downloads/
-output/
-footage/
-test_dest/
-test_mp3/
-test_output/
-test_playlist/
-example_mp3s/
-Kedua.mp3/
-Pertama.mp3/
-Lagu/
-workspace/
-ui.log
-__pycache__/
-*.pyc
