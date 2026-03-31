@@ -12,11 +12,16 @@ export const config = {
   youtube: {
     clientId: process.env.YOUTUBE_CLIENT_ID || '',
     clientSecret: process.env.YOUTUBE_CLIENT_SECRET || '',
-    redirectUri: process.env.YOUTUBE_REDIRECT_URI || 'http://localhost:3001/api/auth/youtube/callback',
+    redirectUri:
+      process.env.YOUTUBE_REDIRECT_URI ||
+      'http://localhost:3001/api/channels/youtube/callback',
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   upload: {
     dir: process.env.UPLOAD_DIR || './uploads',
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10),
+  },
+  live: {
+    ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
   },
 };

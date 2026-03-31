@@ -19,6 +19,8 @@ interface Channel {
   subscriberCount: number;
   viewCount: number;
   isActive: boolean;
+  youtubeConnected?: boolean;
+  youtubeTokenExpiresAt?: string | null;
   _count: {
     schedules: number;
     thumbnails: number;

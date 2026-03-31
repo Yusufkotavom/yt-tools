@@ -18,6 +18,7 @@ import Loading from '@/components/Common/Loading';
 import { formatFileSize } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import axios from 'axios';
 
 interface VideoItem {
   id: string;
@@ -76,8 +77,11 @@ export default function VideoPage() {
         }
         toast.success(`${acceptedFiles.length} video(s) uploaded`);
         fetchVideos();
-      } catch {
-        toast.error('Failed to upload video');
+      } catch (error) {
+        const message = axios.isAxiosError(error)
+          ? (error.response?.data?.error ?? error.message)
+          : 'Failed to upload video';
+        toast.error(message);
       } finally {
         setUploading(false);
       }
@@ -87,8 +91,6 @@ export default function VideoPage() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'video/*': ['.mp4', '.webm', '.ogg', '.mov', '.avi'] },
-    maxSize: 500 * 1024 * 1024,
   });
 
   const handleDelete = async (id: string) => {
@@ -210,7 +212,7 @@ export default function VideoPage() {
               <div className="relative aspect-video bg-gray-900">
                 {playingVideo === video.id ? (
                   <video
-                    src={`/api/videos/${video.id}/file`}
+                    src={`/uploads/${video.filename}`}
                     controls
                     autoPlay
                     className="h-full w-full"

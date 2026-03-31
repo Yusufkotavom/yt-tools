@@ -9,13 +9,22 @@ class ApiService {
     this.client = axios.create({
       baseURL: API_BASE_URL,
       timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     this.client.interceptors.request.use(
       (config) => {
+        // Let browser/axios set multipart boundary automatically for FormData uploads.
+        if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+          if (config.headers && 'Content-Type' in config.headers) {
+            delete (config.headers as Record<string, unknown>)['Content-Type'];
+          }
+        } else {
+          config.headers = config.headers || {};
+          if (!('Content-Type' in config.headers)) {
+            (config.headers as Record<string, unknown>)['Content-Type'] = 'application/json';
+          }
+        }
+
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
@@ -95,6 +104,16 @@ class ApiService {
     return response.data;
   }
 
+  async getYoutubeConnectUrl(channelId: string) {
+    const response = await this.client.get(`/channels/${channelId}/youtube/connect-url`);
+    return response.data;
+  }
+
+  async disconnectYoutubeChannel(channelId: string) {
+    const response = await this.client.post(`/channels/${channelId}/youtube/disconnect`);
+    return response.data;
+  }
+
   // Schedules
   async getSchedules(channelId?: string) {
     const params = channelId ? { channelId } : {};
@@ -157,9 +176,7 @@ class ApiService {
     if (channelId) formData.append('channelId', channelId);
     if (metadataId) formData.append('metadataId', metadataId);
 
-    const response = await this.client.post('/thumbnails/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await this.client.post('/thumbnails/upload', formData);
     return response.data;
   }
 
@@ -262,7 +279,6 @@ class ApiService {
     if (loopCount !== undefined) formData.append('loopCount', String(loopCount));
 
     const response = await this.client.post('/videos/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 300000,
     });
     return response.data;
@@ -285,6 +301,32 @@ class ApiService {
 
   async getLoopVideos() {
     const response = await this.client.get('/videos/loops');
+    return response.data;
+  }
+
+  // Live
+  async getLiveStatus() {
+    const response = await this.client.get('/live/status');
+    return response.data;
+  }
+
+  async startLive(data: {
+    streamKeyId: string;
+    videoId: string;
+    channelId: string;
+    title: string;
+    description?: string;
+    thumbnailId?: string;
+    privacyStatus?: 'public' | 'unlisted' | 'private';
+  }) {
+    const response = await this.client.post('/live/start', data, {
+      timeout: 60000,
+    });
+    return response.data;
+  }
+
+  async stopLive() {
+    const response = await this.client.post('/live/stop');
     return response.data;
   }
 }

@@ -16,9 +16,8 @@ export interface Channel {
   subscriberCount: number;
   viewCount: number;
   isActive: boolean;
-  accessToken?: string;
-  refreshToken?: string;
-  tokenExpiresAt?: string;
+  youtubeConnected?: boolean;
+  youtubeTokenExpiresAt?: string | null;
   _count: {
     schedules: number;
     thumbnails: number;

@@ -12,6 +12,8 @@ import {
   Trash2,
   Edit,
   Save,
+  Link2,
+  Unlink,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/Common/Card';
 import Button from '@/components/Common/Button';
@@ -20,6 +22,8 @@ import Textarea from '@/components/Common/Textarea';
 import Modal from '@/components/Common/Modal';
 import Badge from '@/components/Common/Badge';
 import toast from 'react-hot-toast';
+import api from '@/lib/api';
+import axios from 'axios';
 
 interface ChannelFormData {
   youtubeId: string;
@@ -61,6 +65,30 @@ export default function SettingsPage() {
     fetchChannels();
     fetchProfile();
   }, [fetchChannels, fetchProfile]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab && ['profile', 'channels', 'appearance', 'notifications', 'security'].includes(tab)) {
+      setActiveTab(tab);
+    }
+    const yt = params.get('yt');
+    if (!yt) return;
+
+    if (yt === 'connected') {
+      toast.success('YouTube connected successfully');
+      fetchChannels();
+    } else if (yt === 'error') {
+      const message = params.get('message') || 'Failed to connect YouTube';
+      toast.error(message);
+    }
+
+    params.delete('yt');
+    params.delete('channelId');
+    params.delete('message');
+    const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+    window.history.replaceState({}, '', next);
+  }, [fetchChannels]);
 
   const handleOpenChannelModal = (channel?: typeof channels[0]) => {
     if (channel) {
@@ -109,6 +137,33 @@ export default function SettingsPage() {
       toast.success('Channel deleted successfully');
     } catch {
       toast.error('Failed to delete channel');
+    }
+  };
+
+  const handleConnectYoutube = async (channelId: string) => {
+    try {
+      const response = await api.getYoutubeConnectUrl(channelId);
+      const url = response?.data?.url as string | undefined;
+      if (!url) throw new Error('Missing OAuth URL');
+      window.location.href = url;
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error ?? error.message)
+        : 'Failed to connect YouTube';
+      toast.error(message);
+    }
+  };
+
+  const handleDisconnectYoutube = async (channelId: string) => {
+    try {
+      await api.disconnectYoutubeChannel(channelId);
+      toast.success('YouTube disconnected');
+      fetchChannels();
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error ?? error.message)
+        : 'Failed to disconnect YouTube';
+      toast.error(message);
     }
   };
 
@@ -271,8 +326,28 @@ export default function SettingsPage() {
                           >
                             {channel.isActive ? 'Active' : 'Inactive'}
                           </Badge>
+                          <Badge variant={channel.youtubeConnected ? 'default' : 'secondary'}>
+                            {channel.youtubeConnected ? 'YouTube Connected' : 'YouTube Not Connected'}
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-2">
+                          {channel.youtubeConnected ? (
+                            <button
+                              onClick={() => handleDisconnectYoutube(channel.id)}
+                              className="rounded-lg p-2 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                              title="Disconnect YouTube"
+                            >
+                              <Unlink className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleConnectYoutube(channel.id)}
+                              className="rounded-lg p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              title="Connect YouTube"
+                            >
+                              <Link2 className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleOpenChannelModal(channel)}
                             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700"

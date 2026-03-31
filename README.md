@@ -54,6 +54,29 @@ npm run dev:backend   # http://localhost:3001
 npm run dev:frontend  # http://localhost:5173
 ```
 
+### YouTube OAuth Setup (for Dashboard Live Control)
+
+Add these env vars for backend:
+
+```bash
+YOUTUBE_CLIENT_ID=...
+YOUTUBE_CLIENT_SECRET=...
+YOUTUBE_REDIRECT_URI=http://localhost:3001/api/channels/youtube/callback
+FRONTEND_URL=http://localhost:5173
+```
+
+In Google Cloud Console OAuth app, whitelist redirect URI:
+
+```text
+http://localhost:3001/api/channels/youtube/callback
+```
+
+Then in app:
+1. Open **Settings > Channels**
+2. Click **Connect YouTube** on a channel
+3. Authorize Google account
+4. Start live from **Dashboard > Live Control**
+
 ### Build
 
 ```bash

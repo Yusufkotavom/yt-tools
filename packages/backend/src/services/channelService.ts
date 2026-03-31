@@ -2,9 +2,26 @@ import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { ChannelCreateInput, ChannelUpdateInput } from '../types';
 
+const transformChannel = <
+  T extends {
+    accessToken?: string | null;
+    refreshToken?: string | null;
+    tokenExpiresAt?: Date | null;
+  },
+>(
+  channel: T
+) => {
+  const { accessToken, refreshToken, tokenExpiresAt, ...rest } = channel;
+  return {
+    ...rest,
+    youtubeConnected: Boolean(refreshToken || accessToken),
+    youtubeTokenExpiresAt: tokenExpiresAt ?? null,
+  };
+};
+
 export class ChannelService {
   static async getAll(userId: string) {
-    return prisma.channel.findMany({
+    const channels = await prisma.channel.findMany({
       where: { userId },
       include: {
         _count: {
@@ -18,6 +35,8 @@ export class ChannelService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return channels.map((channel) => transformChannel(channel));
   }
 
   static async getById(id: string, userId: string) {
@@ -39,7 +58,7 @@ export class ChannelService {
       throw new AppError('Channel not found', 404);
     }
 
-    return channel;
+    return transformChannel(channel);
   }
 
   static async create(userId: string, data: ChannelCreateInput) {
@@ -51,12 +70,14 @@ export class ChannelService {
       throw new AppError('Channel already exists', 400);
     }
 
-    return prisma.channel.create({
+    const channel = await prisma.channel.create({
       data: {
         ...data,
         userId,
       },
     });
+
+    return transformChannel(channel);
   }
 
   static async update(id: string, userId: string, data: ChannelUpdateInput) {
@@ -73,10 +94,12 @@ export class ChannelService {
       updateData.tokenExpiresAt = new Date(data.tokenExpiresAt);
     }
 
-    return prisma.channel.update({
+    const updated = await prisma.channel.update({
       where: { id },
       data: updateData,
     });
+
+    return transformChannel(updated);
   }
 
   static async delete(id: string, userId: string) {

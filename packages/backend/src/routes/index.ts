@@ -6,6 +6,7 @@ import videoRoutes from './video';
 import streamKeyRoutes from './streamKey';
 import channelRoutes from './channel';
 import metadataRoutes from './metadata';
+import liveRoutes from './live';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/videos', videoRoutes);
 router.use('/stream-keys', streamKeyRoutes);
 router.use('/channels', channelRoutes);
 router.use('/metadata', metadataRoutes);
+router.use('/live', liveRoutes);
 
 export default router;

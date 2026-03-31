@@ -16,6 +16,7 @@ import EmptyState from '@/components/Common/EmptyState';
 import Loading from '@/components/Common/Loading';
 import { formatFileSize, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 export default function ThumbnailPage() {
   const {
@@ -46,8 +47,11 @@ export default function ThumbnailPage() {
         }
         toast.success(`${acceptedFiles.length} thumbnail(s) uploaded successfully`);
         fetchThumbnails();
-      } catch {
-        toast.error('Failed to upload thumbnail');
+      } catch (error) {
+        const message = axios.isAxiosError(error)
+          ? (error.response?.data?.error ?? error.message)
+          : 'Failed to upload thumbnail';
+        toast.error(message);
       } finally {
         setLoading(false);
       }
@@ -57,10 +61,6 @@ export default function ThumbnailPage() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'image/*': ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
-    },
-    maxSize: 10 * 1024 * 1024, // 10MB
   });
 
   const handleDelete = async (id: string) => {
