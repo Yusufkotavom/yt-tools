@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { ScheduleCreateInput, ScheduleUpdateInput } from '../types';
+import { YoutubeLiveService } from './youtubeLiveService';
 
 export class ScheduleService {
   static async getAll(userId: string, channelId?: string) {
@@ -46,19 +47,20 @@ export class ScheduleService {
   }
 
   static async create(userId: string, data: ScheduleCreateInput) {
+    const { syncToYoutube, ...persistData } = data;
     const channel = await prisma.channel.findFirst({
-      where: { id: data.channelId, userId },
+      where: { id: persistData.channelId, userId },
     });
 
     if (!channel) {
       throw new AppError('Channel not found', 404);
     }
 
-    return prisma.streamSchedule.create({
+    const created = await prisma.streamSchedule.create({
       data: {
-        ...data,
+        ...persistData,
         userId,
-        scheduledAt: new Date(data.scheduledAt),
+        scheduledAt: new Date(persistData.scheduledAt),
       },
       include: {
         channel: {
@@ -70,9 +72,62 @@ export class ScheduleService {
         },
       },
     });
+
+    const shouldSync = syncToYoutube !== false;
+    if (!shouldSync) {
+      return created;
+    }
+
+    try {
+      const synced = await YoutubeLiveService.createScheduledBroadcast(userId, {
+        channelId: persistData.channelId,
+        title: persistData.title,
+        description: persistData.description,
+        scheduledAt: new Date(persistData.scheduledAt),
+        privacyStatus:
+          (persistData.privacy as 'public' | 'unlisted' | 'private') || 'public',
+      });
+
+      return prisma.streamSchedule.update({
+        where: { id: created.id },
+        data: {
+          youtubeBroadcastId: synced.broadcastId,
+          youtubeWatchUrl: synced.watchUrl,
+          youtubeSyncStatus: 'synced',
+          youtubeSyncError: null,
+        },
+        include: {
+          channel: {
+            select: {
+              id: true,
+              name: true,
+              youtubeId: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      return prisma.streamSchedule.update({
+        where: { id: created.id },
+        data: {
+          youtubeSyncStatus: 'sync_error',
+          youtubeSyncError: error instanceof Error ? error.message : 'Failed to sync schedule',
+        },
+        include: {
+          channel: {
+            select: {
+              id: true,
+              name: true,
+              youtubeId: true,
+            },
+          },
+        },
+      });
+    }
   }
 
   static async update(id: string, userId: string, data: ScheduleUpdateInput) {
+    const { syncToYoutube, ...persistData } = data;
     const schedule = await prisma.streamSchedule.findFirst({
       where: { id, userId },
     });
@@ -81,12 +136,12 @@ export class ScheduleService {
       throw new AppError('Schedule not found', 404);
     }
 
-    const updateData: Record<string, unknown> = { ...data };
-    if (data.scheduledAt) {
-      updateData.scheduledAt = new Date(data.scheduledAt);
+    const updateData: Record<string, unknown> = { ...persistData };
+    if (persistData.scheduledAt) {
+      updateData.scheduledAt = new Date(persistData.scheduledAt);
     }
 
-    return prisma.streamSchedule.update({
+    const updated = await prisma.streamSchedule.update({
       where: { id },
       data: updateData,
       include: {
@@ -99,6 +154,67 @@ export class ScheduleService {
         },
       },
     });
+
+    const shouldSync = syncToYoutube !== false;
+    if (!shouldSync) {
+      return updated;
+    }
+
+    if (!updated.youtubeBroadcastId) {
+      return updated;
+    }
+
+    try {
+      await YoutubeLiveService.updateScheduledBroadcast(
+        userId,
+        updated.channelId,
+        updated.youtubeBroadcastId,
+        {
+          title: persistData.title,
+          description: persistData.description,
+          scheduledAt: persistData.scheduledAt
+            ? new Date(persistData.scheduledAt)
+            : undefined,
+          privacyStatus:
+            persistData.privacy as 'public' | 'unlisted' | 'private' | undefined,
+        }
+      );
+
+      return prisma.streamSchedule.update({
+        where: { id: updated.id },
+        data: {
+          youtubeSyncStatus: 'synced',
+          youtubeSyncError: null,
+        },
+        include: {
+          channel: {
+            select: {
+              id: true,
+              name: true,
+              youtubeId: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      return prisma.streamSchedule.update({
+        where: { id: updated.id },
+        data: {
+          youtubeSyncStatus: 'sync_error',
+          youtubeSyncError:
+            error instanceof Error ? error.message : 'Failed to update YouTube schedule',
+        },
+        include: {
+          channel: {
+            select: {
+              id: true,
+              name: true,
+              youtubeId: true,
+            },
+          },
+        },
+      });
+    }
   }
 
   static async delete(id: string, userId: string) {
@@ -108,6 +224,18 @@ export class ScheduleService {
 
     if (!schedule) {
       throw new AppError('Schedule not found', 404);
+    }
+
+    if (schedule.youtubeBroadcastId) {
+      try {
+        await YoutubeLiveService.deleteBroadcast(
+          userId,
+          schedule.channelId,
+          schedule.youtubeBroadcastId
+        );
+      } catch {
+        // Keep delete behavior best-effort for YouTube cleanup.
+      }
     }
 
     return prisma.streamSchedule.delete({ where: { id } });

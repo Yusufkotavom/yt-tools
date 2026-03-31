@@ -23,5 +23,6 @@ export const config = {
   },
   live: {
     ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
+    maxConcurrent: parseInt(process.env.MAX_CONCURRENT_LIVE || '4', 10),
   },
 };

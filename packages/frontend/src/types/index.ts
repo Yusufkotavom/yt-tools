@@ -40,6 +40,10 @@ export interface StreamSchedule {
   tags?: string;
   category?: string;
   privacy: string;
+  youtubeBroadcastId?: string;
+  youtubeWatchUrl?: string;
+  youtubeSyncStatus?: string;
+  youtubeSyncError?: string;
   channel: {
     id: string;
     name: string;
@@ -77,6 +81,9 @@ export interface StreamKey {
   resolution?: string;
   framerate?: number;
   codec?: string;
+  youtubeLiveStreamId?: string;
+  youtubeStreamName?: string;
+  youtubeIngestionAddress?: string;
   channel: {
     id: string;
     name: string;

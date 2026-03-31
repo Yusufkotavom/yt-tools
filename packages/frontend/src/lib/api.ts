@@ -227,6 +227,11 @@ class ApiService {
     return response.data;
   }
 
+  async resolveOrCreateStreamKey(id: string) {
+    const response = await this.client.post(`/stream-keys/${id}/resolve-or-create`);
+    return response.data;
+  }
+
   async markStreamKeyUsed(id: string) {
     const response = await this.client.put(`/stream-keys/${id}/used`);
     return response.data;
@@ -311,7 +316,7 @@ class ApiService {
   }
 
   async startLive(data: {
-    streamKeyId: string;
+    streamKeyId?: string;
     videoId: string;
     channelId: string;
     title: string;
@@ -325,8 +330,25 @@ class ApiService {
     return response.data;
   }
 
-  async stopLive() {
-    const response = await this.client.post('/live/stop');
+  async stopLive(sessionId?: string) {
+    const response = await this.client.post('/live/stop', sessionId ? { sessionId } : {});
+    return response.data;
+  }
+
+  async stopAllLive() {
+    const response = await this.client.post('/live/stop-all');
+    return response.data;
+  }
+
+  async startLiveFromSchedule(data: {
+    scheduleId: string;
+    videoId: string;
+    streamKeyId?: string;
+    thumbnailId?: string;
+  }) {
+    const response = await this.client.post('/live/start-from-schedule', data, {
+      timeout: 60000,
+    });
     return response.data;
   }
 }

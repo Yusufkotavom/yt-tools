@@ -12,6 +12,7 @@ import {
   Search,
   Clock,
   Settings,
+  Link2,
 } from 'lucide-react';
 import Button from '@/components/Common/Button';
 import Modal from '@/components/Common/Modal';
@@ -23,6 +24,8 @@ import { Card, CardContent } from '@/components/Common/Card';
 import { formatDateTime } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { StreamKey } from '@/types';
+import api from '@/lib/api';
+import axios from 'axios';
 
 interface StreamKeyFormData {
   name: string;
@@ -157,6 +160,19 @@ export default function StreamKeyPage() {
     }
   };
 
+  const handleResolveOrCreate = async (id: string) => {
+    try {
+      await api.resolveOrCreateStreamKey(id);
+      toast.success('Stream key mapped to YouTube stream');
+      fetchStreamKeys();
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error ?? error.message)
+        : 'Failed to resolve stream key';
+      toast.error(message);
+    }
+  };
+
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
@@ -231,6 +247,9 @@ export default function StreamKeyPage() {
                         {streamKey.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                       <Badge variant="outline">{streamKey.channel.name}</Badge>
+                      <Badge variant={streamKey.youtubeLiveStreamId ? 'default' : 'warning'}>
+                        {streamKey.youtubeLiveStreamId ? 'Mapped' : 'Unmapped'}
+                      </Badge>
                     </div>
 
                     {/* Stream Key */}
@@ -327,6 +346,13 @@ export default function StreamKeyPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleResolveOrCreate(streamKey.id)}
+                      className="rounded-lg p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      title="Resolve or create YouTube stream mapping"
+                    >
+                      <Link2 className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => handleToggle(streamKey.id)}
                       className={`rounded-lg p-2 ${

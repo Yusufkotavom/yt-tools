@@ -19,19 +19,36 @@ interface AuthState {
 
 interface BroadcastInput {
   channelId: string;
-  streamKeyValue: string;
+  streamKeyValue?: string;
+  youtubeLiveStreamId?: string;
   title: string;
   description?: string;
   privacyStatus?: 'public' | 'unlisted' | 'private';
   thumbnailPath?: string;
 }
 
+interface ScheduledBroadcastInput {
+  channelId: string;
+  title: string;
+  description?: string;
+  scheduledAt: Date;
+  privacyStatus?: 'public' | 'unlisted' | 'private';
+  thumbnailPath?: string;
+}
+
+export interface YouTubeStreamResult {
+  id: string;
+  title: string;
+  streamName: string;
+  ingestionAddress?: string;
+}
+
 interface BroadcastResult {
   broadcastId: string;
   watchUrl: string;
   youtubeStatus: string;
-  streamId: string;
-  streamTitle: string;
+  streamId?: string;
+  streamTitle?: string;
 }
 
 const normalizeStreamKey = (value: string) => {
@@ -42,6 +59,9 @@ const normalizeStreamKey = (value: string) => {
   }
   return trimmed;
 };
+
+const buildWatchUrl = (broadcastId: string) =>
+  `https://www.youtube.com/watch?v=${broadcastId}`;
 
 export class YoutubeLiveService {
   private static createOAuthClient() {
@@ -124,6 +144,15 @@ export class YoutubeLiveService {
     };
   }
 
+  private static extractStreamMeta(stream: youtube_v3.Schema$LiveStream): YouTubeStreamResult {
+    return {
+      id: stream.id || '',
+      title: stream.snippet?.title || 'Live Stream',
+      streamName: stream.cdn?.ingestionInfo?.streamName || '',
+      ingestionAddress: stream.cdn?.ingestionInfo?.ingestionAddress || undefined,
+    };
+  }
+
   static getConnectUrl(userId: string, channelId: string) {
     const oauth2Client = this.createOAuthClient();
     const stateToken = jwt.sign(
@@ -157,9 +186,7 @@ export class YoutubeLiveService {
         id: decoded.channelId,
         userId: decoded.userId,
       },
-      select: {
-        id: true,
-      },
+      select: { id: true },
     });
 
     if (!channel) {
@@ -205,11 +232,18 @@ export class YoutubeLiveService {
     });
   }
 
-  private static async resolveYouTubeStream(
-    youtube: youtube_v3.Youtube,
-    streamKeyValue: string
-  ) {
-    const normalized = normalizeStreamKey(streamKeyValue);
+  static async resolveOrCreateYouTubeStream(
+    userId: string,
+    channelId: string,
+    opts: {
+      youtubeLiveStreamId?: string;
+      streamKeyValue?: string;
+      title?: string;
+      createIfMissing?: boolean;
+    } = {}
+  ): Promise<YouTubeStreamResult> {
+    const { youtube } = await this.getAuthorizedYoutube(userId, channelId);
+    const normalized = opts.streamKeyValue ? normalizeStreamKey(opts.streamKeyValue) : undefined;
 
     const list = await youtube.liveStreams.list({
       part: ['id', 'snippet', 'cdn', 'status'],
@@ -218,36 +252,64 @@ export class YoutubeLiveService {
     });
 
     const streams = list.data.items || [];
-    const match = streams.find((stream) => {
-      const name = stream.cdn?.ingestionInfo?.streamName ?? '';
-      return (
-        name === normalized ||
-        (normalized.length > 0 && normalized.endsWith(name)) ||
-        (name.length > 0 && name.endsWith(normalized))
-      );
-    });
+    const exactById = opts.youtubeLiveStreamId
+      ? streams.find((stream) => stream.id === opts.youtubeLiveStreamId)
+      : undefined;
+    if (exactById && exactById.id) {
+      return this.extractStreamMeta(exactById);
+    }
 
-    if (!match || !match.id) {
+    const byKey = normalized
+      ? streams.find((stream) => {
+          const name = stream.cdn?.ingestionInfo?.streamName ?? '';
+          return (
+            name === normalized ||
+            (normalized.length > 0 && normalized.endsWith(name)) ||
+            (name.length > 0 && name.endsWith(normalized))
+          );
+        })
+      : undefined;
+    if (byKey && byKey.id) {
+      return this.extractStreamMeta(byKey);
+    }
+
+    if (!opts.createIfMissing) {
       throw new AppError(
         'Failed to map stream key to a YouTube live stream. Make sure this stream key belongs to your connected YouTube channel.',
         400
       );
     }
 
-    return {
-      id: match.id,
-      title: match.snippet?.title || 'Live Stream',
-    };
+    const created = await youtube.liveStreams.insert({
+      part: ['snippet', 'cdn', 'contentDetails'],
+      requestBody: {
+        snippet: {
+          title: opts.title || `Auto Stream ${new Date().toISOString()}`,
+          description: 'Auto-created by YT Live Manager',
+        },
+        cdn: {
+          frameRate: '30fps',
+          ingestionType: 'rtmp',
+          resolution: '1080p',
+        },
+        contentDetails: {
+          isReusable: true,
+        },
+      },
+    });
+
+    if (!created.data.id) {
+      throw new AppError('Failed to create YouTube live stream automatically', 400);
+    }
+
+    return this.extractStreamMeta(created.data);
   }
 
-  static async createAndBindBroadcast(
+  static async createScheduledBroadcast(
     userId: string,
-    input: BroadcastInput
+    input: ScheduledBroadcastInput
   ): Promise<BroadcastResult> {
     const { youtube } = await this.getAuthorizedYoutube(userId, input.channelId);
-    const stream = await this.resolveYouTubeStream(youtube, input.streamKeyValue);
-
-    const scheduledStart = new Date(Date.now() + 60_000).toISOString();
 
     const create = await youtube.liveBroadcasts.insert({
       part: ['snippet', 'status', 'contentDetails'],
@@ -255,7 +317,7 @@ export class YoutubeLiveService {
         snippet: {
           title: input.title,
           description: input.description,
-          scheduledStartTime: scheduledStart,
+          scheduledStartTime: input.scheduledAt.toISOString(),
         },
         status: {
           privacyStatus: input.privacyStatus || 'public',
@@ -273,14 +335,8 @@ export class YoutubeLiveService {
 
     const broadcastId = create.data.id;
     if (!broadcastId) {
-      throw new AppError('Failed to create YouTube broadcast', 400);
+      throw new AppError('Failed to create YouTube scheduled broadcast', 400);
     }
-
-    await youtube.liveBroadcasts.bind({
-      part: ['id', 'contentDetails'],
-      id: broadcastId,
-      streamId: stream.id,
-    });
 
     if (input.thumbnailPath && fs.existsSync(input.thumbnailPath)) {
       await youtube.thumbnails.set({
@@ -293,8 +349,110 @@ export class YoutubeLiveService {
 
     return {
       broadcastId,
-      watchUrl: `https://www.youtube.com/watch?v=${broadcastId}`,
+      watchUrl: buildWatchUrl(broadcastId),
       youtubeStatus: create.data.status?.lifeCycleStatus || 'created',
+    };
+  }
+
+  static async updateScheduledBroadcast(
+    userId: string,
+    channelId: string,
+    broadcastId: string,
+    data: {
+      title?: string;
+      description?: string;
+      scheduledAt?: Date;
+      privacyStatus?: 'public' | 'unlisted' | 'private';
+      thumbnailPath?: string;
+    }
+  ) {
+    const { youtube } = await this.getAuthorizedYoutube(userId, channelId);
+    const existing = await youtube.liveBroadcasts.list({
+      part: ['id', 'snippet', 'status', 'contentDetails'],
+      id: [broadcastId],
+    });
+    const current = existing.data.items?.[0];
+    if (!current) {
+      throw new AppError('YouTube broadcast not found', 404);
+    }
+
+    await youtube.liveBroadcasts.update({
+      part: ['snippet', 'status', 'contentDetails'],
+      requestBody: {
+        id: broadcastId,
+        snippet: {
+          ...current.snippet,
+          title: data.title ?? current.snippet?.title ?? '',
+          description: data.description ?? current.snippet?.description ?? '',
+          scheduledStartTime:
+            data.scheduledAt?.toISOString() ?? current.snippet?.scheduledStartTime ?? undefined,
+        },
+        status: {
+          ...current.status,
+          privacyStatus: data.privacyStatus ?? current.status?.privacyStatus ?? 'public',
+        },
+        contentDetails: current.contentDetails,
+      },
+    });
+
+    if (data.thumbnailPath && fs.existsSync(data.thumbnailPath)) {
+      await youtube.thumbnails.set({
+        videoId: broadcastId,
+        media: {
+          body: fs.createReadStream(data.thumbnailPath),
+        },
+      });
+    }
+  }
+
+  static async deleteBroadcast(userId: string, channelId: string, broadcastId: string) {
+    const { youtube } = await this.getAuthorizedYoutube(userId, channelId);
+    await youtube.liveBroadcasts.delete({ id: broadcastId });
+  }
+
+  static async bindBroadcastToStream(
+    userId: string,
+    channelId: string,
+    broadcastId: string,
+    streamId: string
+  ) {
+    const { youtube } = await this.getAuthorizedYoutube(userId, channelId);
+    await youtube.liveBroadcasts.bind({
+      part: ['id', 'contentDetails'],
+      id: broadcastId,
+      streamId,
+    });
+  }
+
+  static async createAndBindBroadcast(
+    userId: string,
+    input: BroadcastInput
+  ): Promise<BroadcastResult> {
+    const stream = await this.resolveOrCreateYouTubeStream(userId, input.channelId, {
+      youtubeLiveStreamId: input.youtubeLiveStreamId,
+      streamKeyValue: input.streamKeyValue,
+      title: `${input.title} Stream`,
+      createIfMissing: true,
+    });
+
+    const scheduled = await this.createScheduledBroadcast(userId, {
+      channelId: input.channelId,
+      title: input.title,
+      description: input.description,
+      scheduledAt: new Date(Date.now() + 60_000),
+      privacyStatus: input.privacyStatus,
+      thumbnailPath: input.thumbnailPath,
+    });
+
+    await this.bindBroadcastToStream(
+      userId,
+      input.channelId,
+      scheduled.broadcastId,
+      stream.id
+    );
+
+    return {
+      ...scheduled,
       streamId: stream.id,
       streamTitle: stream.title,
     };

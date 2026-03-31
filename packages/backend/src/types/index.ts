@@ -41,6 +41,7 @@ export interface ScheduleCreateInput {
   category?: string;
   privacy?: string;
   channelId: string;
+  syncToYoutube?: boolean;
 }
 
 export interface ScheduleUpdateInput {
@@ -56,6 +57,7 @@ export interface ScheduleUpdateInput {
   tags?: string;
   category?: string;
   privacy?: string;
+  syncToYoutube?: boolean;
 }
 
 export interface MetadataCreateInput {
@@ -89,6 +91,10 @@ export interface StreamKeyCreateInput {
   framerate?: number;
   codec?: string;
   channelId: string;
+  youtubeLiveStreamId?: string;
+  youtubeStreamName?: string;
+  youtubeIngestionAddress?: string;
+  autoCreateYoutubeStream?: boolean;
 }
 
 export interface StreamKeyUpdateInput {
@@ -101,6 +107,10 @@ export interface StreamKeyUpdateInput {
   resolution?: string;
   framerate?: number;
   codec?: string;
+  youtubeLiveStreamId?: string;
+  youtubeStreamName?: string;
+  youtubeIngestionAddress?: string;
+  autoCreateYoutubeStream?: boolean;
 }
 
 export interface ChannelCreateInput {

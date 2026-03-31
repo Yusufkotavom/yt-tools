@@ -41,6 +41,10 @@ interface Schedule {
   tags?: string;
   category?: string;
   privacy: string;
+  youtubeBroadcastId?: string;
+  youtubeWatchUrl?: string;
+  youtubeSyncStatus?: string;
+  youtubeSyncError?: string;
   channel: {
     id: string;
     name: string;
@@ -78,6 +82,9 @@ interface StreamKey {
   resolution?: string;
   framerate?: number;
   codec?: string;
+  youtubeLiveStreamId?: string;
+  youtubeStreamName?: string;
+  youtubeIngestionAddress?: string;
   channel: {
     id: string;
     name: string;

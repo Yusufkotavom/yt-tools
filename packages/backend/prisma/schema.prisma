@@ -65,6 +65,10 @@ model StreamSchedule {
   tags          String?
   category      String?
   privacy       String   @default("public")
+  youtubeBroadcastId String?
+  youtubeWatchUrl    String?
+  youtubeSyncStatus  String? @default("pending")
+  youtubeSyncError   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -145,6 +149,9 @@ model StreamKey {
   resolution    String?
   framerate     Int?
   codec         String?
+  youtubeLiveStreamId String?
+  youtubeStreamName   String?
+  youtubeIngestionAddress String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

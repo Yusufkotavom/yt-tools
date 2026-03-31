@@ -32,6 +32,7 @@ interface VideoItem {
 }
 
 interface LiveSession {
+  id: string;
   status: 'starting' | 'live' | 'stopping' | 'stopped' | 'error';
   youtubeStatus?: string;
   youtubeWatchUrl?: string;
@@ -62,7 +63,7 @@ export default function DashboardPage() {
 
   const [upcomingStreams, setUpcomingStreams] = useState<StreamSchedule[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
+  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveForm, setLiveForm] = useState({
     channelId: '',
@@ -95,7 +96,7 @@ export default function DashboardPage() {
   const fetchLiveStatus = useCallback(async () => {
     try {
       const response = await api.getLiveStatus();
-      setLiveSession(response.data);
+      setLiveSessions(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch live status:', error);
     }
@@ -110,14 +111,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchStreamKeys(liveForm.channelId || undefined);
-    fetchThumbnails(liveForm.channelId || undefined);
-    fetchVideos(liveForm.channelId || undefined);
+    fetchThumbnails();
+    fetchVideos();
   }, [fetchStreamKeys, fetchThumbnails, fetchVideos, liveForm.channelId]);
 
   useEffect(() => {
     const interval = setInterval(fetchLiveStatus, 5000);
     return () => clearInterval(interval);
   }, [fetchLiveStatus]);
+
+  const availableVideos = useMemo(
+    () =>
+      videos.filter(
+        (video) => !liveForm.channelId || !video.channel?.id || video.channel.id === liveForm.channelId
+      ),
+    [videos, liveForm.channelId]
+  );
 
   const availableStreamKeys = useMemo(
     () =>
@@ -131,7 +140,7 @@ export default function DashboardPage() {
     () =>
       thumbnails.filter(
         (thumbnail) =>
-          !liveForm.channelId || thumbnail.channel?.id === liveForm.channelId
+          !liveForm.channelId || !thumbnail.channel?.id || thumbnail.channel.id === liveForm.channelId
       ),
     [thumbnails, liveForm.channelId]
   );
@@ -143,10 +152,10 @@ export default function DashboardPage() {
   }, [availableStreamKeys, liveForm.streamKeyId]);
 
   useEffect(() => {
-    if (!liveForm.videoId && videos.length > 0) {
-      setLiveForm((prev) => ({ ...prev, videoId: videos[0].id }));
+    if (!liveForm.videoId && availableVideos.length > 0) {
+      setLiveForm((prev) => ({ ...prev, videoId: availableVideos[0].id }));
     }
-  }, [videos, liveForm.videoId]);
+  }, [availableVideos, liveForm.videoId]);
 
   useEffect(() => {
     if (!liveForm.thumbnailId && availableThumbnails.length > 0) {
@@ -155,8 +164,8 @@ export default function DashboardPage() {
   }, [availableThumbnails, liveForm.thumbnailId]);
 
   const startLive = async () => {
-    if (!liveForm.channelId || !liveForm.streamKeyId || !liveForm.videoId || !liveForm.title.trim()) {
-      toast.error('Channel, stream key, video, and title are required');
+    if (!liveForm.channelId || !liveForm.videoId || !liveForm.title.trim()) {
+      toast.error('Channel, video, and title are required');
       return;
     }
 
@@ -171,7 +180,7 @@ export default function DashboardPage() {
         thumbnailId: liveForm.thumbnailId || undefined,
         privacyStatus: liveForm.privacyStatus,
       });
-      setLiveSession(response.data);
+      setLiveSessions((prev) => [response.data, ...prev.filter((s) => s.id !== response.data.id)]);
       toast.success('Live stream started');
     } catch (error) {
       const message = axios.isAxiosError(error)
@@ -185,11 +194,11 @@ export default function DashboardPage() {
     }
   };
 
-  const stopLive = async () => {
+  const stopLive = async (sessionId: string) => {
     setLiveLoading(true);
     try {
-      const response = await api.stopLive();
-      setLiveSession(response.data);
+      const response = await api.stopLive(sessionId);
+      setLiveSessions((prev) => prev.map((s) => (s.id === sessionId ? response.data : s)));
       toast.success('Stopping live stream');
     } catch (error) {
       const message = axios.isAxiosError(error)
@@ -197,6 +206,29 @@ export default function DashboardPage() {
         : error instanceof Error
         ? error.message
         : 'Failed to stop live stream';
+      toast.error(message);
+    } finally {
+      setLiveLoading(false);
+    }
+  };
+
+  const stopAllLive = async () => {
+    setLiveLoading(true);
+    try {
+      const response = await api.stopAllLive();
+      if (Array.isArray(response.data)) {
+        const byId = new Map<string, LiveSession>(
+          response.data.map((s: LiveSession): [string, LiveSession] => [s.id, s])
+        );
+        setLiveSessions((prev) => prev.map((s) => byId.get(s.id) || s));
+      }
+      toast.success('Stopping all live streams');
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error ?? error.message)
+        : error instanceof Error
+        ? error.message
+        : 'Failed to stop all live streams';
       toast.error(message);
     } finally {
       setLiveLoading(false);
@@ -213,16 +245,19 @@ export default function DashboardPage() {
   };
 
   const liveStatusVariant =
-    liveSession?.status === 'live'
+    liveSessions.some((s) => s.status === 'live')
       ? 'success'
-      : liveSession?.status === 'starting' || liveSession?.status === 'stopping'
+      : liveSessions.some((s) => s.status === 'starting' || s.status === 'stopping')
       ? 'warning'
-      : liveSession?.status === 'error'
+      : liveSessions.some((s) => s.status === 'error')
       ? 'danger'
       : 'secondary';
 
-  const isLiveActive =
-    liveSession?.status === 'live' || liveSession?.status === 'starting' || liveSession?.status === 'stopping';
+  const activeSessions = liveSessions.filter(
+    (session) =>
+      session.status === 'live' || session.status === 'starting' || session.status === 'stopping'
+  );
+  const latestSession = liveSessions[0] || null;
 
   return (
     <div className="space-y-6">
@@ -418,7 +453,9 @@ export default function DashboardPage() {
             <Radio className="h-5 w-5" />
             Live Control
           </CardTitle>
-          <Badge variant={liveStatusVariant}>{liveSession?.status || 'idle'}</Badge>
+          <Badge variant={liveStatusVariant}>
+            {activeSessions.length > 0 ? `${activeSessions.length} active` : 'idle'}
+          </Badge>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -478,7 +515,7 @@ export default function DashboardPage() {
                 className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Select video</option>
-                {videos.map((video) => (
+                {availableVideos.map((video) => (
                   <option key={video.id} value={video.id}>
                     {video.originalName}
                   </option>
@@ -544,42 +581,38 @@ export default function DashboardPage() {
             rows={4}
           />
 
-          {liveSession?.note && (
+          {latestSession?.note && (
             <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-200">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>{liveSession.note}</p>
+              <p>{latestSession.note}</p>
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              onClick={startLive}
-              disabled={isLiveActive}
-              loading={liveLoading && !isLiveActive}
-            >
+            <Button onClick={startLive} loading={liveLoading}>
               <Radio className="mr-2 h-4 w-4" />
               Start Live
             </Button>
             <Button
               variant="danger"
-              onClick={stopLive}
-              disabled={!isLiveActive}
-              loading={liveLoading && isLiveActive}
+              onClick={stopAllLive}
+              disabled={activeSessions.length === 0}
+              loading={liveLoading && activeSessions.length > 0}
             >
               <Square className="mr-2 h-4 w-4" />
-              Stop Live
+              Stop All
             </Button>
-            {liveSession?.streamKeyName && (
+            {latestSession?.streamKeyName && (
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                Key: {liveSession.streamKeyName} • Video: {liveSession.videoName}
+                Latest: {latestSession.streamKeyName} • {latestSession.videoName}
               </span>
             )}
-            {liveSession?.youtubeStatus && (
-              <Badge variant="outline">YouTube: {liveSession.youtubeStatus}</Badge>
+            {latestSession?.youtubeStatus && (
+              <Badge variant="outline">YouTube: {latestSession.youtubeStatus}</Badge>
             )}
-            {liveSession?.youtubeWatchUrl && (
+            {latestSession?.youtubeWatchUrl && (
               <a
-                href={liveSession.youtubeWatchUrl}
+                href={latestSession.youtubeWatchUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-sm text-primary-600 hover:text-primary-500"
@@ -589,12 +622,67 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {liveSession?.recentLogs && liveSession.recentLogs.length > 0 && (
+          {latestSession?.recentLogs && latestSession.recentLogs.length > 0 && (
             <div className="rounded-md bg-gray-900 p-3">
               <p className="mb-2 text-xs uppercase tracking-wide text-gray-400">ffmpeg log</p>
               <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs text-gray-200">
-                {liveSession.recentLogs.slice(-8).join('\n')}
+                {latestSession.recentLogs.slice(-8).join('\n')}
               </pre>
+            </div>
+          )}
+
+          {liveSessions.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Live Sessions
+              </p>
+              {liveSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex flex-wrap items-center gap-2 rounded-md border border-gray-200 p-3 dark:border-gray-700"
+                >
+                  <Badge
+                    variant={
+                      session.status === 'live'
+                        ? 'success'
+                        : session.status === 'error'
+                        ? 'danger'
+                        : session.status === 'stopped'
+                        ? 'secondary'
+                        : 'warning'
+                    }
+                  >
+                    {session.status}
+                  </Badge>
+                  <span className="text-sm text-gray-700 dark:text-gray-200">
+                    {session.title}
+                  </span>
+                  {session.youtubeWatchUrl && (
+                    <a
+                      href={session.youtubeWatchUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary-600 hover:text-primary-500"
+                    >
+                      YouTube
+                    </a>
+                  )}
+                  <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                    {formatDateTime(session.startedAt)}
+                  </span>
+                  {(session.status === 'live' || session.status === 'starting') && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => stopLive(session.id)}
+                      loading={liveLoading}
+                    >
+                      <Square className="mr-1 h-3 w-3" />
+                      Stop
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

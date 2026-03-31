@@ -286,6 +286,19 @@ export default function SchedulePage() {
                     >
                       {schedule.privacy}
                     </Badge>
+                    {schedule.youtubeSyncStatus && (
+                      <Badge
+                        variant={
+                          schedule.youtubeSyncStatus === 'synced'
+                            ? 'success'
+                            : schedule.youtubeSyncStatus === 'sync_error'
+                            ? 'danger'
+                            : 'warning'
+                        }
+                      >
+                        yt:{schedule.youtubeSyncStatus}
+                      </Badge>
+                    )}
                   </div>
                   {schedule.description && (
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -299,7 +312,20 @@ export default function SchedulePage() {
                     )}
                     <span>{schedule.channel.name}</span>
                     {schedule.category && <span>{schedule.category}</span>}
+                    {schedule.youtubeWatchUrl && (
+                      <a
+                        href={schedule.youtubeWatchUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary-600 hover:text-primary-500"
+                      >
+                        YouTube
+                      </a>
+                    )}
                   </div>
+                  {schedule.youtubeSyncError && (
+                    <p className="mt-2 text-xs text-red-500">{schedule.youtubeSyncError}</p>
+                  )}
                   {schedule.tags && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {schedule.tags.split(',').map((tag, i) => (

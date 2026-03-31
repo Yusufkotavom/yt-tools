@@ -1,107 +1,132 @@
 # YouTube Live Manager
 
-A comprehensive YouTube Live stream management application with a complete GUI.
+A web app to manage YouTube Live operations from one dashboard:
+- connect channel OAuth
+- manage stream keys and video assets
+- run multiple live sessions
+- sync schedule data to YouTube broadcasts
 
-## Features
+## Current Implementation
 
-- **Dashboard** - Overview of channels, schedules, thumbnails, and stream keys
-- **Live Stream Scheduling** - Calendar view with drag-and-drop scheduling
-- **Thumbnail Management** - Upload, preview, and manage stream thumbnails
-- **Metadata Templates** - Create reusable metadata templates for streams
-- **Stream Key Management** - Secure storage and management of stream keys
-- **Multi-User Support** - Manage multiple YouTube channels
+- **Dashboard Live Control**
+  - start/stop live sessions
+  - stop all active sessions
+  - monitor per-session status and logs
+- **YouTube OAuth per Channel**
+  - connect/disconnect channel account
+- **Stream Key Management**
+  - create/update/toggle keys
+  - resolve/create mapping to YouTube liveStream
+- **Schedule Management**
+  - internal schedule CRUD
+  - sync status to YouTube (`synced`, `pending`, `sync_error`)
+- **Media Management**
+  - video + thumbnail upload and reuse
 
 ## Tech Stack
 
-### Frontend
-- React 18 + TypeScript
-- Tailwind CSS
-- Zustand (State Management)
-- React Big Calendar
-- Vite
+- Frontend: React 18, TypeScript, Vite, Tailwind, Zustand
+- Backend: Node.js, Express, TypeScript
+- Data: Prisma + SQLite
+- Integrations: YouTube Data API
 
-### Backend
-- Node.js + Express
-- TypeScript
-- Prisma ORM
-- SQLite
+## Setup
 
-## Getting Started
+### 1) Prerequisites
 
-### Prerequisites
 - Node.js 18+
+- Google Cloud OAuth credentials (for YouTube integration)
 
-### Installation
+### 2) Install
 
 ```bash
-# Install dependencies
 npm install
-
-# Setup database
-cd packages/backend
-npm run db:push
-npm run db:seed
 ```
 
-### Development
+### 3) Configure environment
 
-```bash
-# Run both frontend and backend
-npm run dev
-
-# Or run separately
-npm run dev:backend   # http://localhost:3001
-npm run dev:frontend  # http://localhost:5173
-```
-
-### YouTube OAuth Setup (for Dashboard Live Control)
-
-Add these env vars for backend:
+Set backend environment variables:
 
 ```bash
 YOUTUBE_CLIENT_ID=...
 YOUTUBE_CLIENT_SECRET=...
 YOUTUBE_REDIRECT_URI=http://localhost:3001/api/channels/youtube/callback
 FRONTEND_URL=http://localhost:5173
+MAX_CONCURRENT_LIVE=4
+FFMPEG_PATH=ffmpeg
 ```
 
-In Google Cloud Console OAuth app, whitelist redirect URI:
+Google OAuth redirect URI must include:
 
 ```text
 http://localhost:3001/api/channels/youtube/callback
 ```
 
-Then in app:
-1. Open **Settings > Channels**
-2. Click **Connect YouTube** on a channel
-3. Authorize Google account
-4. Start live from **Dashboard > Live Control**
-
-### Build
+### 4) Database init
 
 ```bash
-npm run build
+npm run db:push --workspace=packages/backend
+npm run db:seed --workspace=packages/backend
+```
+
+### 5) Run in development
+
+```bash
+npm run dev
+```
+
+- Backend: `http://localhost:3001`
+- Frontend: `http://localhost:5173`
+
+## Operational Flow
+
+1. Open **Settings > Channels**
+2. Add channel and click **Connect YouTube**
+3. Open **Stream Keys**
+4. Add stream key or click resolve/create mapping
+5. Upload video and thumbnail assets
+6. Open **Dashboard > Live Control**
+7. Start live (single or multiple sessions)
+8. Monitor status and stop per session or stop all
+
+## Notes and Limits
+
+- Concurrent live sessions are limited by `MAX_CONCURRENT_LIVE`.
+- One stream key cannot be used by two active sessions at the same time.
+- If schedule sync fails, internal schedule is still saved with `sync_error`.
+- FFmpeg must be available in server runtime.
+
+## Development Roadmap (Next)
+
+- **Priority A: Reliability**
+  - stronger process recovery after backend restart
+  - automatic retry queue for YouTube sync failures
+  - structured observability (session metrics + alerting)
+- **Priority B: Scheduling Automation**
+  - start live directly from schedule UI with prebound stream/video profile
+  - retry + reconciliation worker for missed updates
+- **Priority C: Operator Productivity**
+  - profile presets (video+thumbnail+key+privacy)
+  - bulk schedule operations and batch sync
+  - audit timeline per channel/session
+- **Priority D: Multi-user Governance**
+  - role-based permissions per channel
+  - approval workflow for schedule publish/live start
+
+## Useful Commands
+
+```bash
+# backend typecheck
+npm run typecheck --workspace=packages/backend
+
+# frontend typecheck
+npm run typecheck --workspace=packages/frontend
+
+# regenerate prisma client
+npm run db:generate --workspace=packages/backend
 ```
 
 ## Demo Account
 
 - Email: `demo@example.com`
 - Password: `demo123`
-
-## Project Structure
-
-```
-yt-tools/
-├── packages/
-│   ├── backend/           # Express API server
-│   │   ├── prisma/        # Database schema & seed
-│   │   └── src/           # Source code
-│   └── frontend/          # React application
-│       └── src/           # Source code
-├── package.json           # Root package.json
-└── README.md
-```
-
-## License
-
-MIT

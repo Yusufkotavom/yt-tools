@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { StreamKeyCreateInput, StreamKeyUpdateInput } from '../types';
+import { YoutubeLiveService } from './youtubeLiveService';
 
 export class StreamKeyService {
   static async getAll(userId: string, channelId?: string) {
@@ -44,24 +45,39 @@ export class StreamKeyService {
   }
 
   static async create(userId: string, data: StreamKeyCreateInput) {
+    const { autoCreateYoutubeStream, ...persistData } = data;
     const channel = await prisma.channel.findFirst({
-      where: { id: data.channelId, userId },
+      where: { id: persistData.channelId, userId },
     });
 
     if (!channel) {
       throw new AppError('Channel not found', 404);
     }
 
+    const liveStream = autoCreateYoutubeStream
+      ? await YoutubeLiveService.resolveOrCreateYouTubeStream(userId, persistData.channelId, {
+          streamKeyValue: persistData.keyValue,
+          youtubeLiveStreamId: persistData.youtubeLiveStreamId,
+          title: persistData.name,
+          createIfMissing: true,
+        })
+      : null;
+
     return prisma.streamKey.create({
       data: {
-        ...data,
+        ...persistData,
         userId,
-        expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
+        expiresAt: persistData.expiresAt ? new Date(persistData.expiresAt) : undefined,
+        youtubeLiveStreamId: persistData.youtubeLiveStreamId || liveStream?.id,
+        youtubeStreamName: persistData.youtubeStreamName || liveStream?.streamName,
+        youtubeIngestionAddress:
+          persistData.youtubeIngestionAddress || liveStream?.ingestionAddress,
       },
     });
   }
 
   static async update(id: string, userId: string, data: StreamKeyUpdateInput) {
+    const { autoCreateYoutubeStream, ...persistData } = data;
     const streamKey = await prisma.streamKey.findFirst({
       where: { id, userId },
     });
@@ -70,14 +86,68 @@ export class StreamKeyService {
       throw new AppError('Stream key not found', 404);
     }
 
-    const updateData: Record<string, unknown> = { ...data };
-    if (data.expiresAt) {
-      updateData.expiresAt = new Date(data.expiresAt);
+    const updateData: Record<string, unknown> = { ...persistData };
+    if (persistData.expiresAt) {
+      updateData.expiresAt = new Date(persistData.expiresAt);
     }
+
+    const liveStream = autoCreateYoutubeStream
+      ? await YoutubeLiveService.resolveOrCreateYouTubeStream(
+          userId,
+          streamKey.channelId,
+          {
+            streamKeyValue: persistData.keyValue || streamKey.keyValue,
+            youtubeLiveStreamId:
+              persistData.youtubeLiveStreamId || streamKey.youtubeLiveStreamId || undefined,
+            title: persistData.name || streamKey.name,
+            createIfMissing: true,
+          }
+        )
+      : null;
 
     return prisma.streamKey.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...updateData,
+        youtubeLiveStreamId:
+          persistData.youtubeLiveStreamId || liveStream?.id || streamKey.youtubeLiveStreamId,
+        youtubeStreamName:
+          persistData.youtubeStreamName || liveStream?.streamName || streamKey.youtubeStreamName,
+        youtubeIngestionAddress:
+          persistData.youtubeIngestionAddress ||
+          liveStream?.ingestionAddress ||
+          streamKey.youtubeIngestionAddress,
+      },
+    });
+  }
+
+  static async resolveOrCreate(id: string, userId: string) {
+    const streamKey = await prisma.streamKey.findFirst({
+      where: { id, userId },
+    });
+
+    if (!streamKey) {
+      throw new AppError('Stream key not found', 404);
+    }
+
+    const liveStream = await YoutubeLiveService.resolveOrCreateYouTubeStream(
+      userId,
+      streamKey.channelId,
+      {
+        streamKeyValue: streamKey.keyValue,
+        youtubeLiveStreamId: streamKey.youtubeLiveStreamId || undefined,
+        title: streamKey.name,
+        createIfMissing: true,
+      }
+    );
+
+    return prisma.streamKey.update({
+      where: { id },
+      data: {
+        youtubeLiveStreamId: liveStream.id,
+        youtubeStreamName: liveStream.streamName,
+        youtubeIngestionAddress: liveStream.ingestionAddress,
+      },
     });
   }
 

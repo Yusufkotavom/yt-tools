@@ -97,4 +97,20 @@ export class StreamKeyController {
       res.status(400).json({ success: false, error: message });
     }
   }
+
+  static async resolveOrCreate(req: AuthRequest, res: Response) {
+    try {
+      const id = getParam(req, 'id');
+      const streamKey = await StreamKeyService.resolveOrCreate(id, req.user!.id);
+      res.json({
+        success: true,
+        data: streamKey,
+        message: 'Stream key resolved with YouTube stream',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to resolve stream key';
+      res.status(400).json({ success: false, error: message });
+    }
+  }
 }
