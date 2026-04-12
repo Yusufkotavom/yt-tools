@@ -7,6 +7,7 @@ import streamKeyRoutes from './streamKey';
 import channelRoutes from './channel';
 import metadataRoutes from './metadata';
 import liveRoutes from './live';
+import simpleLiveRoutes from './simpleLive';
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use('/stream-keys', streamKeyRoutes);
 router.use('/channels', channelRoutes);
 router.use('/metadata', metadataRoutes);
 router.use('/live', liveRoutes);
+router.use('/simple-live', simpleLiveRoutes);
 
 export default router;

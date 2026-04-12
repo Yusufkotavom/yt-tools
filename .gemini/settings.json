@@ -1,0 +1,9 @@
+{
+  "security": {
+    "enablePermanentToolApproval": true,
+    "toolSandboxing": false
+  },
+  "general": {
+    "defaultApprovalMode": "auto_edit"
+  }
+}

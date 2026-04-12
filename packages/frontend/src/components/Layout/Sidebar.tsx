@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import {
   LayoutDashboard,
+  Zap,
   Calendar,
   Image,
   Video,
@@ -15,6 +16,7 @@ import {
 
 const menuItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/simple-live', icon: Zap, label: 'Simple Live' },
   { path: '/schedules', icon: Calendar, label: 'Schedules' },
   { path: '/thumbnails', icon: Image, label: 'Thumbnails' },
   { path: '/videos', icon: Video, label: 'Videos' },

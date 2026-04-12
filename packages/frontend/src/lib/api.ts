@@ -351,6 +351,32 @@ class ApiService {
     });
     return response.data;
   }
+
+  // Simple Live (stream key only, no YouTube)
+  async getSimpleLiveStatus() {
+    const response = await this.client.get('/simple-live/status');
+    return response.data;
+  }
+
+  async startSimpleLive(data: Record<string, unknown>) {
+    const response = await this.client.post('/simple-live/start', data, {
+      timeout: 60000,
+    });
+    return response.data;
+  }
+
+  async stopSimpleLive(sessionId?: string) {
+    const response = await this.client.post(
+      '/simple-live/stop',
+      sessionId ? { sessionId } : {}
+    );
+    return response.data;
+  }
+
+  async stopAllSimpleLive() {
+    const response = await this.client.post('/simple-live/stop-all');
+    return response.data;
+  }
 }
 
 export const api = new ApiService();

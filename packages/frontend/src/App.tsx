@@ -16,6 +16,7 @@ import AuthLayout from '@/components/Layout/AuthLayout';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import DashboardPage from '@/pages/DashboardPage';
+import SimpleLivePage from '@/pages/SimpleLivePage';
 import SchedulePage from '@/pages/SchedulePage';
 import ThumbnailPage from '@/pages/ThumbnailPage';
 import MetadataPage from '@/pages/MetadataPage';
@@ -72,6 +73,7 @@ function App() {
           }
         >
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/simple-live" element={<SimpleLivePage />} />
           <Route path="/schedules" element={<SchedulePage />} />
           <Route path="/thumbnails" element={<ThumbnailPage />} />
           <Route path="/videos" element={<VideoPage />} />
